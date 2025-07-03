@@ -47,7 +47,7 @@ function autoTimeout() {
 }
 
 function submitQuery(body) {
-  const { API_URL = 'http://localhost:7071' } = import.meta.env;
+  const API_URL = 'https://contract-ai-functions.azurewebsites.net';
   fetch(`${API_URL}/api/assistant`, {
     body,
     method: "POST",
