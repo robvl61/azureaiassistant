@@ -19,11 +19,11 @@ const {
 // please add proper error handling.
 
 async function initAzureOpenAI(context) {
-  console.log("Using Azure OpenAI (w/ Microsoft Entra ID) ...");
-  const credential = new DefaultAzureCredential();
-  const azureADTokenProvider = getBearerTokenProvider(credential, "https://cognitiveservices.azure.com/.default");
+  console.log("Using Azure OpenAI (w/ API Key) ...");
   return new AzureOpenAI({
-    azureADTokenProvider,
+    apiKey: process.env.AZURE_OPENAI_API_KEY,
+    endpoint: process.env.AZURE_OPENAI_ENDPOINT,
+    apiVersion: process.env.OPENAI_API_VERSION
   });
 }
 
