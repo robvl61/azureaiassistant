@@ -47,7 +47,7 @@ function autoTimeout() {
 }
 
 function submitQuery(body) {
-  const API_URL = 'https://contract-ai-functions.azurewebsites.net';
+  const API_URL = 'https://contract-ai-functions-fcfge9g8epf8ffda.swedencentral-01.azurewebsites.net';
   fetch(`${API_URL}/api/assistant`, {
     body,
     method: "POST",
