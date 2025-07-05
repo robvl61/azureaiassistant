@@ -458,22 +458,30 @@ app.http("files", {
       
       if (request.method === "DELETE") {
         console.log("🗑️ Delete request received");
+        console.log("🔍 Full URL:", request.url);
         
         // Extract fileId from URL path
         const url = new URL(request.url);
+        console.log("🔍 URL pathname:", url.pathname);
         const pathParts = url.pathname.split('/');
+        console.log("🔍 Path parts:", pathParts);
         const fileId = pathParts[pathParts.length - 1];
         
-        console.log(`🗑️ Deleting file: ${fileId}`);
+        console.log(`🗑️ Extracted fileId: "${fileId}"`);
         
-        if (!fileId || !fileId.startsWith("assistant-")) {
+        if (!fileId || fileId === 'files' || !fileId.startsWith("assistant-")) {
+          console.log("❌ Invalid fileId detected");
           return {
             status: 400,
             headers: {
               ...corsHeaders,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ error: "Invalid file ID" })
+            body: JSON.stringify({ 
+              error: "Invalid file ID",
+              received: fileId,
+              expected: "assistant-XXXXX format"
+            })
           };
         }
         
