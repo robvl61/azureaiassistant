@@ -460,16 +460,13 @@ app.http("files", {
         console.log("🗑️ Delete request received");
         console.log("🔍 Full URL:", request.url);
         
-        // Extract fileId from URL path
+        // Extract fileId from query parameter instead of URL path
         const url = new URL(request.url);
-        console.log("🔍 URL pathname:", url.pathname);
-        const pathParts = url.pathname.split('/');
-        console.log("🔍 Path parts:", pathParts);
-        const fileId = pathParts[pathParts.length - 1];
+        const fileId = url.searchParams.get('fileId');
         
-        console.log(`🗑️ Extracted fileId: "${fileId}"`);
+        console.log(`🗑️ Extracted fileId from query: "${fileId}"`);
         
-        if (!fileId || fileId === 'files' || !fileId.startsWith("assistant-")) {
+        if (!fileId || !fileId.startsWith("assistant-")) {
           console.log("❌ Invalid fileId detected");
           return {
             status: 400,
@@ -480,7 +477,8 @@ app.http("files", {
             body: JSON.stringify({ 
               error: "Invalid file ID",
               received: fileId,
-              expected: "assistant-XXXXX format"
+              expected: "assistant-XXXXX format",
+              usage: "DELETE /api/files?fileId=assistant-XXXXX"
             })
           };
         }
