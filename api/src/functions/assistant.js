@@ -255,4 +255,130 @@ app.http("assistant", {
   },
 });
 
+// Upload endpoint for file management
+app.http("upload", {
+  methods: ["POST", "OPTIONS"],
+  authLevel: "anonymous",
+  handler: async (request) => {
+    console.log("📤 Upload request received!");
+    console.log(`📍 URL: ${request.url}`);
+    console.log(`🔧 Method: ${request.method}`);
+    
+    // CORS headers
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400"
+    };
+    
+    // Handle OPTIONS preflight request
+    if (request.method === "OPTIONS") {
+      console.log("🔧 Handling CORS preflight for upload");
+      return {
+        status: 200,
+        headers: corsHeaders,
+        body: ""
+      };
+    }
+    
+    try {
+      console.log("📋 Processing file upload...");
+      
+      // Get FormData from request
+      const formData = await request.formData();
+      const file = formData.get('file');
+      const fileName = formData.get('fileName') || file?.name || 'uploaded-file';
+      const fileSize = formData.get('fileSize') || file?.size || 0;
+      
+      console.log(`📁 File name: ${fileName}`);
+      console.log(`📏 File size: ${fileSize} bytes`);
+      
+      if (!file) {
+        console.log("❌ No file provided");
+        return {
+          status: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: "No file provided" })
+        };
+      }
+      
+      console.log("🔧 Initializing Azure OpenAI for upload...");
+      const openai = await initAzureOpenAI();
+      
+      console.log("📤 Uploading file to Azure OpenAI...");
+      
+      // Convert file to buffer for upload
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+      const fileBlob = new Blob([fileBuffer], { type: file.type });
+      
+      // Upload file to Azure OpenAI
+      const uploadedFile = await openai.files.create({
+        file: fileBlob,
+        purpose: "assistants"
+      });
+      
+      console.log("✅ File uploaded successfully!");
+      console.log(`🆔 File ID: ${uploadedFile.id}`);
+      
+      // Add file to vector store (if you have one configured)
+      if (ASSISTANT_ID) {
+        try {
+          console.log("🔗 Adding file to assistant vector store...");
+          const assistant = await openai.beta.assistants.retrieve(ASSISTANT_ID);
+          
+          // Get the vector store ID from assistant
+          const vectorStoreId = assistant.tool_resources?.file_search?.vector_store_ids?.[0];
+          
+          if (vectorStoreId) {
+            console.log(`📚 Adding to vector store: ${vectorStoreId}`);
+            await openai.beta.vectorStores.files.create(vectorStoreId, {
+              file_id: uploadedFile.id
+            });
+            console.log("✅ File added to vector store");
+          } else {
+            console.log("⚠️ No vector store found on assistant");
+          }
+        } catch (vectorError) {
+          console.error("⚠️ Failed to add to vector store:", vectorError);
+          // Continue anyway, file is still uploaded
+        }
+      }
+      
+      const response = {
+        fileId: uploadedFile.id,
+        fileName: uploadedFile.filename || fileName,
+        fileSize: uploadedFile.bytes || fileSize,
+        status: "uploaded"
+      };
+      
+      console.log("🎉 Upload complete:", response);
+      
+      return {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(response)
+      };
+      
+    } catch (error) {
+      console.error("💥 Upload error:", error);
+      return {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          error: "Upload failed", 
+          message: error.message 
+        })
+      };
+    }
+  },
+});
+
 console.log("✅ Assistant function with file support setup complete!");
+console.log("✅ Upload endpoint configured!");
