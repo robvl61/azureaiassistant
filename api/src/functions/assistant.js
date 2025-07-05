@@ -390,5 +390,144 @@ app.http("upload", {
   },
 });
 
+// Files management endpoint - GET all files
+app.http("files", {
+  methods: ["GET", "DELETE", "OPTIONS"],
+  authLevel: "anonymous",
+  handler: async (request) => {
+    console.log("📁 Files management request received!");
+    console.log(`📍 URL: ${request.url}`);
+    console.log(`🔧 Method: ${request.method}`);
+    
+    // CORS headers
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400"
+    };
+    
+    // Handle OPTIONS preflight request
+    if (request.method === "OPTIONS") {
+      console.log("🔧 Handling CORS preflight for files");
+      return {
+        status: 200,
+        headers: corsHeaders,
+        body: ""
+      };
+    }
+    
+    try {
+      console.log("🔧 Initializing Azure OpenAI for files management...");
+      const openai = await initAzureOpenAI();
+      
+      if (request.method === "GET") {
+        console.log("📋 Getting list of all files...");
+        
+        // Get all files from Azure OpenAI
+        const files = await openai.files.list();
+        
+        // Filter only assistant files
+        const assistantFiles = files.data.filter(file => 
+          file.purpose === "assistants" && 
+          file.id.startsWith("assistant-")
+        );
+        
+        console.log(`✅ Found ${assistantFiles.length} assistant files`);
+        
+        const response = {
+          files: assistantFiles.map(file => ({
+            fileId: file.id,
+            fileName: file.filename,
+            fileSize: file.bytes,
+            uploadedAt: new Date(file.created_at * 1000).toISOString(),
+            status: file.status
+          })),
+          total: assistantFiles.length
+        };
+        
+        return {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(response)
+        };
+      }
+      
+      if (request.method === "DELETE") {
+        console.log("🗑️ Delete request received");
+        
+        // Extract fileId from URL path
+        const url = new URL(request.url);
+        const pathParts = url.pathname.split('/');
+        const fileId = pathParts[pathParts.length - 1];
+        
+        console.log(`🗑️ Deleting file: ${fileId}`);
+        
+        if (!fileId || !fileId.startsWith("assistant-")) {
+          return {
+            status: 400,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ error: "Invalid file ID" })
+          };
+        }
+        
+        // Remove from vector store first (if exists)
+        if (ASSISTANT_ID) {
+          try {
+            console.log("🔗 Removing from vector store...");
+            const assistant = await openai.beta.assistants.retrieve(ASSISTANT_ID);
+            const vectorStoreId = assistant.tool_resources?.file_search?.vector_store_ids?.[0];
+            
+            if (vectorStoreId) {
+              await openai.beta.vectorStores.files.del(vectorStoreId, fileId);
+              console.log("✅ Removed from vector store");
+            }
+          } catch (vectorError) {
+            console.warn("⚠️ Could not remove from vector store:", vectorError.message);
+            // Continue with file deletion anyway
+          }
+        }
+        
+        // Delete the file
+        await openai.files.del(fileId);
+        console.log("✅ File deleted successfully");
+        
+        return {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            message: "File deleted successfully",
+            fileId: fileId
+          })
+        };
+      }
+      
+    } catch (error) {
+      console.error("💥 Files management error:", error);
+      return {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          error: "Files management failed", 
+          message: error.message 
+        })
+      };
+    }
+  },
+});
+
 console.log("✅ Assistant function with file support setup complete!");
 console.log("✅ Upload endpoint configured!");
+console.log("✅ Files management endpoint configured!");
