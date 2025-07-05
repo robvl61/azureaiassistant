@@ -335,17 +335,33 @@ async function writeAndSendEmail(subject, html) {
 }
 
 // API definition
-console.log("🌐 Setting up HTTP function...");
 app.setup({ enableHttpStream: true });
 
 app.http("assistant", {
-  methods: ["POST"],
+  methods: ["POST", "OPTIONS"],
   authLevel: "anonymous",
   handler: async (request) => {
     console.log("🌍 HTTP Request received!");
     console.log(`📍 URL: ${request.url}`);
     console.log(`🔧 Method: ${request.method}`);
-    console.log(`📋 Headers:`, Object.keys(request.headers));
+    
+    // CORS headers voor alle responses
+    const corsHeaders = {
+      "Access-Control-Allow-Origin": "*", // Of specifiek: "https://purple-island-048f8ca03.2.azurestaticapps.net"
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400"
+    };
+    
+    // Handle OPTIONS preflight request
+    if (request.method === "OPTIONS") {
+      console.log("🔧 Handling CORS preflight request");
+      return {
+        status: 200,
+        headers: corsHeaders,
+        body: ""
+      };
+    }
     
     try {
       const query = await request.text();
@@ -356,6 +372,7 @@ app.http("assistant", {
         console.log("⚠️ Empty query received");
         return {
           status: 400,
+          headers: corsHeaders,
           body: "Empty query not allowed"
         };
       }
@@ -364,6 +381,7 @@ app.http("assistant", {
       
       return {
         headers: {
+          ...corsHeaders,
           'Content-Type': 'text/plain',
           "Transfer-Encoding": "chunked"
         }, 
@@ -374,6 +392,7 @@ app.http("assistant", {
       console.error("💥 Request handler error:", error);
       return {
         status: 500,
+        headers: corsHeaders,
         body: `Request error: ${error.message}`
       };
     }
