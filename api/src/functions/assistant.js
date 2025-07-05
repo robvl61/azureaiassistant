@@ -308,13 +308,23 @@ app.http("upload", {
       
       console.log("📤 Uploading file to Azure OpenAI...");
       
-      // Convert file to buffer for upload
+      // Convert file to proper format for Azure OpenAI
       const fileBuffer = Buffer.from(await file.arrayBuffer());
-      const fileBlob = new Blob([fileBuffer], { type: file.type });
+      
+      // Create a File-like object that Azure OpenAI expects
+      const fileForUpload = new File([fileBuffer], fileName, {
+        type: file.type || 'application/octet-stream'
+      });
+      
+      console.log(`🔍 File details for upload:`, {
+        name: fileForUpload.name,
+        size: fileForUpload.size,
+        type: fileForUpload.type
+      });
       
       // Upload file to Azure OpenAI
       const uploadedFile = await openai.files.create({
-        file: fileBlob,
+        file: fileForUpload,
         purpose: "assistants"
       });
       
